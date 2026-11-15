@@ -1,0 +1,42 @@
+{
+  "name": "dsh-window-fit",
+  "version": "1.0.0",
+  "description": "Resizes the DeepSeek Harness desktop window to a share of the screen on launch, with a Settings row to change the size. Windows only.",
+  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "window", "window-size"],
+  "license": "MIT",
+  "author": "lwsyidong",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lwsyidong/dsh-window-fit.git"
+  },
+  "homepage": "https://github.com/lwsyidong/dsh-window-fit#readme",
+  "type": "module",
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "helper.ps1",
+    "helper.vbs",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "README.md",
+    "test"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

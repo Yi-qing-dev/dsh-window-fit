@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "窗口大小",
+    "description": "启动时把桌面窗口缩放到屏幕的固定比例并居中；设置 → 通用 里可直接改宽高百分比。",
+    "detail": "docs/DETAIL.md"
+  }
+}

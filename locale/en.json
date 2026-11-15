@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Window size",
+    "description": "Scales and centres the desktop window to a fixed share of the screen on launch, adjustable from Settings → General.",
+    "detail": "docs/DETAIL.md"
+  }
+}

@@ -1,0 +1,6 @@
+- insert:
+    - id: window-fit
+      name: 'dsh-window-fit'
+      config:
+        widthRatio: 0.7875
+        heightRatio: 0.8144
