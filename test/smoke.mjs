@@ -56,7 +56,25 @@ console.log('client: ok — registers settings.general.item as "window-fit"')
 
 /* ---------- host: routes, validation and persistence ---------- */
 
-const { apply } = await import(pathToFileURL(join(root, 'index.js')).href)
+const { apply, pickRatios } = await import(pathToFileURL(join(root, 'index.js')).href)
+
+/* "Apply now" must use the values currently in the inputs, not the saved ones. */
+assert.deepEqual(
+  pickRatios({ widthRatio: 0.6, heightRatio: 0.55 }, { widthRatio: 0.9, heightRatio: 0.9 }),
+  { widthRatio: 0.6, heightRatio: 0.55 },
+  'apply uses the requested values',
+)
+assert.deepEqual(
+  pickRatios({}, { widthRatio: 0.9, heightRatio: 0.9 }),
+  { widthRatio: 0.9, heightRatio: 0.9 },
+  'apply falls back to the saved configuration',
+)
+assert.deepEqual(
+  pickRatios({ widthRatio: 5, heightRatio: 0.05 }, { widthRatio: 0.9, heightRatio: 0.9 }),
+  { widthRatio: 0.9, heightRatio: 0.9 },
+  'out-of-range values fall back instead of being applied',
+)
+console.log('host: ok — apply picks requested ratios with a saved fallback')
 
 const routes = new Map()
 const edits = []

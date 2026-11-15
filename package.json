@@ -1,6 +1,6 @@
 {
   "name": "dsh-window-fit",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Resizes the DeepSeek Harness desktop window to a share of the screen on launch, with a Settings row to change the size. Windows only.",
   "keywords": [
     "dsh",

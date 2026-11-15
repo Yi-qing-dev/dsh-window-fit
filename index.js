@@ -97,6 +97,16 @@ function sendJson(res, status, value) {
   res.end(body)
 }
 
+/** Pick the ratios a request asks for, falling back to the saved configuration. */
+export function pickRatios(input, current) {
+  const width = Number(input?.widthRatio)
+  const height = Number(input?.heightRatio)
+  return {
+    widthRatio: Number.isFinite(width) && width > 0.1 && width <= 1 ? width : current.widthRatio,
+    heightRatio: Number.isFinite(height) && height > 0.1 && height <= 1 ? height : current.heightRatio,
+  }
+}
+
 export function apply(ctx, config) {
   if (process.platform !== 'win32') return
   const current = {
@@ -140,8 +150,11 @@ export function apply(ctx, config) {
 
     register('apply', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' })
-      fitWindow(current.widthRatio, current.heightRatio, current.timeoutSeconds)
-      sendJson(res, 200, { ...state(), applied: true })
+      const body = await readJsonBody(req)
+      if (body.ok !== true) return sendJson(res, 400, { ok: false, error: body.error })
+      const { widthRatio, heightRatio } = pickRatios(body.value, current)
+      fitWindow(widthRatio, heightRatio, current.timeoutSeconds)
+      sendJson(res, 200, { ok: true, widthRatio, heightRatio, timeoutSeconds: current.timeoutSeconds, applied: true })
     })
 
     register('save', async (req, res) => {

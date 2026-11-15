@@ -14,8 +14,8 @@ window.__ModuleLoader__.load({
           height: '高',
           save: '保存并应用',
           apply: '立即应用',
-          saved: '已保存，下次启动生效',
-          applied: '已应用',
+          saved: '已保存并立即应用',
+          applied: '已按当前输入应用',
           failed: '保存失败',
           loading: '读取中…',
         }
@@ -26,8 +26,8 @@ window.__ModuleLoader__.load({
           height: 'H',
           save: 'Save and apply',
           apply: 'Apply now',
-          saved: 'Saved — used on the next launch',
-          applied: 'Applied',
+          saved: 'Saved and applied now',
+          applied: 'Applied the current values',
           failed: 'Save failed',
           loading: 'Loading…',
         }
@@ -135,7 +135,10 @@ window.__ModuleLoader__.load({
       const applyNow = React.useCallback(async () => {
         setBusy(true)
         try {
-          const result = await post('apply')
+          const result = await post('apply', {
+            widthRatio: Number(width) / 100,
+            heightRatio: Number(height) / 100,
+          })
           if (result?.ok !== true) throw new Error(result?.error || copy.failed)
           setError(false)
           setStatus(copy.applied)
@@ -145,7 +148,7 @@ window.__ModuleLoader__.load({
         } finally {
           setBusy(false)
         }
-      }, [post])
+      }, [post, width, height])
 
       return h('div', { style: rowStyle }, [
         h('div', { key: 'text', style: textStyle }, [
