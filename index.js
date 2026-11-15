@@ -111,12 +111,6 @@ export function apply(ctx, config) {
     return () => {}
   })
 
-  const server = ctx.get?.('webServer')
-  if (server === undefined || typeof server.register !== 'function') {
-    log('webServer unavailable; the Settings row has nothing to talk to')
-    return
-  }
-
   const state = () => ({
     ok: true,
     widthRatio: current.widthRatio,
@@ -124,48 +118,59 @@ export function apply(ctx, config) {
     timeoutSeconds: current.timeoutSeconds,
   })
 
-  const register = (suffix, handler) =>
-    ctx.effect(
-      () => server.register({ kind: 'exact', path: `${ROUTE}/${suffix}`, handler }),
-      `window-fit route ${suffix}`,
-    )
-
-  register('state', async (req, res) => {
-    sendJson(res, 200, state())
-  })
-  log(`routes registered under ${ROUTE}`)
-
-  register('apply', async (req, res) => {
-    if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' })
-    fitWindow(current.widthRatio, current.heightRatio, current.timeoutSeconds)
-    sendJson(res, 200, { ...state(), applied: true })
-  })
-
-  register('save', async (req, res) => {
-    if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' })
-    const body = await readJsonBody(req)
-    if (body.ok !== true) return sendJson(res, 400, { ok: false, error: body.error })
-    const widthRatio = Number(body.value?.widthRatio)
-    const heightRatio = Number(body.value?.heightRatio)
-    if (!Number.isFinite(widthRatio) || widthRatio <= 0.1 || widthRatio > 1) {
-      return sendJson(res, 400, { ok: false, error: 'widthRatio must be within (0.1, 1]' })
-    }
-    if (!Number.isFinite(heightRatio) || heightRatio <= 0.1 || heightRatio > 1) {
-      return sendJson(res, 400, { ok: false, error: 'heightRatio must be within (0.1, 1]' })
+  // Services are only reachable from a context that injected them, so the
+  // Settings routes live in a `webServer` child scope.
+  ctx.inject(['webServer'], (webCtx) => {
+    const server = webCtx.webServer
+    if (server === undefined || typeof server.register !== 'function') {
+      log('webServer unavailable; the Settings row has nothing to talk to')
+      return
     }
 
-    const editor = ctx.get?.('configEditor')
-    const entry = ctx.fiber?.entry
-    if (editor === undefined || entry === undefined) {
-      return sendJson(res, 503, { ok: false, error: 'configuration cannot be saved in this profile' })
-    }
-    try {
-      await editor.edit(entry, (candidate) => ({ ...candidate, widthRatio, heightRatio }))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      log(`save failed: ${message}`)
-      return sendJson(res, 400, { ok: false, error: message })
-    }
-    sendJson(res, 200, { ok: true, widthRatio, heightRatio, timeoutSeconds: current.timeoutSeconds })
+    const register = (suffix, handler) =>
+      webCtx.effect(
+        () => server.register({ kind: 'exact', path: `${ROUTE}/${suffix}`, handler }),
+        `window-fit route ${suffix}`,
+      )
+
+    register('state', async (req, res) => {
+      sendJson(res, 200, state())
+    })
+    log(`routes registered under ${ROUTE} (scoped=${webCtx !== ctx})`)
+
+    register('apply', async (req, res) => {
+      if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' })
+      fitWindow(current.widthRatio, current.heightRatio, current.timeoutSeconds)
+      sendJson(res, 200, { ...state(), applied: true })
+    })
+
+    register('save', async (req, res) => {
+      if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' })
+      const body = await readJsonBody(req)
+      if (body.ok !== true) return sendJson(res, 400, { ok: false, error: body.error })
+      const widthRatio = Number(body.value?.widthRatio)
+      const heightRatio = Number(body.value?.heightRatio)
+      if (!Number.isFinite(widthRatio) || widthRatio <= 0.1 || widthRatio > 1) {
+        return sendJson(res, 400, { ok: false, error: 'widthRatio must be within (0.1, 1]' })
+      }
+      if (!Number.isFinite(heightRatio) || heightRatio <= 0.1 || heightRatio > 1) {
+        return sendJson(res, 400, { ok: false, error: 'heightRatio must be within (0.1, 1]' })
+      }
+
+      const editor = webCtx.get?.('configEditor') ?? ctx.get?.('configEditor')
+      const entry = webCtx.fiber?.entry ?? ctx.fiber?.entry
+      if (editor === undefined || entry === undefined) {
+        log('configEditor unavailable; cannot save')
+        return sendJson(res, 503, { ok: false, error: 'configuration cannot be saved in this profile' })
+      }
+      try {
+        await editor.edit(entry, (candidate) => ({ ...candidate, widthRatio, heightRatio }))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        log(`save failed: ${message}`)
+        return sendJson(res, 400, { ok: false, error: message })
+      }
+      sendJson(res, 200, { ok: true, widthRatio, heightRatio, timeoutSeconds: current.timeoutSeconds })
+    })
   })
 }

@@ -60,30 +60,36 @@ const { apply } = await import(pathToFileURL(join(root, 'index.js')).href)
 
 const routes = new Map()
 const edits = []
-const ctx = {
-  effect: (fn) => fn(),
-  get: (name) => {
-    if (name === 'webServer') {
-      return {
-        register: ({ path, handler }) => {
-          routes.set(path, handler)
-          return () => {}
-        },
-      }
-    }
-    if (name === 'configEditor') {
-      return {
-        edit: async (entry, change) => {
-          edits.push(change({ widthRatio: 0.7875, heightRatio: 0.8144 }))
-        },
-      }
-    }
-    return undefined
+const services = {
+  webServer: {
+    register: ({ path, handler }) => {
+      routes.set(path, handler)
+      return () => {}
+    },
   },
-  fiber: { entry: { id: 'window-fit' } },
+  configEditor: {
+    edit: async (entry, change) => {
+      edits.push(change({ widthRatio: 0.7875, heightRatio: 0.8144 }))
+    },
+  },
 }
 
-apply(ctx, { widthRatio: 0.7875, heightRatio: 0.8144, timeoutSeconds: 5 })
+/** Build a context whose `inject` hands the requested services to a child scope. */
+function makeCtx() {
+  const ctx = {
+    effect: (fn) => fn(),
+    get: (name) => services[name],
+    inject: (deps, run) => {
+      const child = makeCtx()
+      for (const name of deps) child[name] = services[name]
+      return run(child)
+    },
+    fiber: { entry: { id: 'window-fit' } },
+  }
+  return ctx
+}
+
+apply(makeCtx(), { widthRatio: 0.7875, heightRatio: 0.8144, timeoutSeconds: 5 })
 
 assert.deepEqual(
   [...routes.keys()].sort(),
