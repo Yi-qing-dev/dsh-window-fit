@@ -107,6 +107,18 @@ export function pickRatios(input, current) {
   }
 }
 
+/** True when the request comes from this application's own page. */
+export function isSameOriginRequest(req, host) {
+  if (typeof host !== 'string' || host === '') return false
+  const origin = req?.headers?.origin
+  if (typeof origin !== 'string' || origin === '') return false
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
+
 export function apply(ctx, config) {
   if (process.platform !== 'win32') return
   const current = {
@@ -148,8 +160,17 @@ export function apply(ctx, config) {
     })
     log(`routes registered under ${ROUTE} (scoped=${webCtx !== ctx})`)
 
+    /** Refuse callers that are not this application's own page. */
+    const ownPage = (req, res) => {
+      if (isSameOriginRequest(req, req?.headers?.host)) return true
+      log(`rejected request without a same-origin Origin header (${String(req?.headers?.origin ?? 'none')})`)
+      sendJson(res, 403, { ok: false, error: 'cross-origin requests are not allowed' })
+      return false
+    }
+
     register('apply', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' })
+      if (!ownPage(req, res)) return
       const body = await readJsonBody(req)
       if (body.ok !== true) return sendJson(res, 400, { ok: false, error: body.error })
       const { widthRatio, heightRatio } = pickRatios(body.value, current)
@@ -159,6 +180,7 @@ export function apply(ctx, config) {
 
     register('save', async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' })
+      if (!ownPage(req, res)) return
       const body = await readJsonBody(req)
       if (body.ok !== true) return sendJson(res, 400, { ok: false, error: body.error })
       const widthRatio = Number(body.value?.widthRatio)

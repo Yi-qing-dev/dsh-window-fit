@@ -56,7 +56,7 @@ console.log('client: ok — registers settings.general.item as "window-fit"')
 
 /* ---------- host: routes, validation and persistence ---------- */
 
-const { apply, pickRatios } = await import(pathToFileURL(join(root, 'index.js')).href)
+const { apply, pickRatios, isSameOriginRequest } = await import(pathToFileURL(join(root, 'index.js')).href)
 
 /* "Apply now" must use the values currently in the inputs, not the saved ones. */
 assert.deepEqual(
@@ -127,39 +127,86 @@ function respond() {
   return res
 }
 
+/** A request double from this application's own page. */
+function ownedRequest(method, payload) {
+  return {
+    method,
+    headers: { host: '127.0.0.1:5000', origin: 'http://127.0.0.1:5000' },
+    on(type, fn) {
+      if (type === 'data' && payload !== undefined) fn(Buffer.from(JSON.stringify(payload)))
+      if (type === 'end') fn()
+    },
+  }
+}
+
+/* Cross-origin callers are refused before anything runs. */
 let res = respond()
+await routes.get('/api/window-fit/apply')(
+  {
+    method: 'POST',
+    headers: { host: '127.0.0.1:5000', origin: 'https://evil.example' },
+    on(type, fn) {
+      if (type === 'data') fn(Buffer.from(JSON.stringify({ widthRatio: 0.5, heightRatio: 0.5 })))
+      if (type === 'end') fn()
+    },
+  },
+  res,
+)
+assert.equal(res.status, 403, 'a foreign Origin must be refused')
+
+res = respond()
+await routes.get('/api/window-fit/save')(ownedRequest('POST'), respond())
+let crossSave = respond()
+await routes.get('/api/window-fit/save')(
+  {
+    method: 'POST',
+    headers: { host: '127.0.0.1:5000', origin: 'https://evil.example' },
+    on(type, fn) {
+      if (type === 'data') fn(Buffer.from(JSON.stringify({ widthRatio: 0.5, heightRatio: 0.5 })))
+      if (type === 'end') fn()
+    },
+  },
+  crossSave,
+)
+assert.equal(crossSave.status, 403, 'a foreign Origin must not save')
+console.log('host: ok — cross-origin apply/save refused with 403')
+
+res = respond()
 await routes.get('/api/window-fit/state')({ method: 'GET' }, res)
 assert.equal(res.status, 200)
 assert.equal(res.body.widthRatio, 0.7875)
 console.log('host: ok — state route returns', JSON.stringify(res.body))
 
 res = respond()
-await routes.get('/api/window-fit/save')({ method: 'POST', on(type, fn) { if (type === 'end') fn() } }, res)
+await routes.get('/api/window-fit/save')(ownedRequest('POST'), res)
 assert.equal(res.status, 400, 'a save without ratios must be rejected')
 
 res = respond()
-const badBody = {
-  method: 'POST',
-  on(type, fn) {
-    if (type === 'data') fn(Buffer.from('{not json'))
-    if (type === 'end') fn()
+await routes.get('/api/window-fit/save')(
+  {
+    method: 'POST',
+    headers: { host: '127.0.0.1:5000', origin: 'http://127.0.0.1:5000' },
+    on(type, fn) {
+      if (type === 'data') fn(Buffer.from('{not json'))
+      if (type === 'end') fn()
+    },
   },
-}
-await routes.get('/api/window-fit/save')(badBody, res)
+  res,
+)
 assert.equal(res.status, 400, 'invalid JSON must be rejected')
 console.log('host: ok — invalid saves rejected with 400')
 
-const goodReq = {
-  method: 'POST',
-  on(type, fn) {
-    if (type === 'data') fn(Buffer.from(JSON.stringify({ widthRatio: 0.7, heightRatio: 0.75 })))
-    if (type === 'end') fn()
-  },
-}
 res = respond()
-await routes.get('/api/window-fit/save')(goodReq, res)
+await routes.get('/api/window-fit/save')(ownedRequest('POST', { widthRatio: 0.7, heightRatio: 0.75 }), res)
 assert.equal(res.status, 200, 'a valid save must succeed')
 assert.deepEqual(edits.at(-1), { widthRatio: 0.7, heightRatio: 0.75 })
 console.log('host: ok — valid save persisted', JSON.stringify(edits.at(-1)))
+
+/* Same-origin helper covers the header shapes a real request can carry. */
+assert.equal(isSameOriginRequest({ headers: { origin: 'http://127.0.0.1:5000' } }, '127.0.0.1:5000'), true)
+assert.equal(isSameOriginRequest({ headers: { origin: 'http://127.0.0.1:5001' } }, '127.0.0.1:5000'), false)
+assert.equal(isSameOriginRequest({ headers: {} }, '127.0.0.1:5000'), false)
+assert.equal(isSameOriginRequest({ headers: { origin: 'not a url' } }, '127.0.0.1:5000'), false)
+console.log('host: ok — same-origin check handles missing, foreign and malformed origins')
 
 console.log('smoke: all checks passed')
