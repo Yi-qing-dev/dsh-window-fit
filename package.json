@@ -10,12 +10,12 @@
     "window-size"
   ],
   "license": "MIT",
-  "author": "lwsyidong",
+  "author": "Yi-qing-dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lwsyidong/dsh-window-fit.git"
+    "url": "git+https://github.com/Yi-qing-dev/dsh-window-fit.git"
   },
-  "homepage": "https://github.com/lwsyidong/dsh-window-fit#readme",
+  "homepage": "https://github.com/Yi-qing-dev/dsh-window-fit#readme",
   "type": "module",
   "scripts": {
     "test": "node test/smoke.mjs"
